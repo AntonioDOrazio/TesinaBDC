@@ -1,0 +1,8 @@
+{
+  "host": "localhost",
+  "username": "test-user",
+  "password": "testtest",
+  "port": 3306,
+  "database": "progetto_basi_dati"
+}
+
