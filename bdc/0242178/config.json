@@ -3,6 +3,6 @@
   "username": "test-user",
   "password": "testtest",
   "port": 3306,
-  "database": "progetto_basi_dati"
+  "database": "gestione_lingue_straniere"
 }
 

@@ -35,3 +35,7 @@ sostituendo a `<matricola>` la propria matricola (corrispondente al nome della s
 La configurazione del Dockerfile è estremamente minimalista. Nell'improbabile caso che abbiate bisogno di software addizionale per far funzionare la vostra applicazione, indicatelo chiaramente nell'email che invierete al docente all'atto della consegna del progetto.
 
 docker run -e "STUDENTE=0242178" -it bdc
+
+
+
+// docker build -t bdc -f Dockerfile .
