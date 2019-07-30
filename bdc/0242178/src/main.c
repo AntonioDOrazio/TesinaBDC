@@ -149,6 +149,7 @@ loginInsegnante:
 	}
 	mysql_free_result(result);
 
+	mysql_close(con);
 
 }
 
@@ -171,10 +172,10 @@ void gestioneAllievo()
  	while(sceltaMenu != 0) 
  	{
 		printf("Benvenuto %s. Scegli l'operazione\n", cf);
-		printf("1 - Iscrizione ad attività\n");
+		printf("1 - Iscrizione ad attivitï¿½\n");
 		printf("2 - Prenotazione lezione privata\n");
 		printf("3 - Lista lezioni private\n");
-		printf("4 - Lista iscrizioni ad attività\n");
+		printf("4 - Lista iscrizioni ad attivitï¿½\n");
 		printf("0 - Termina il programma\n");
 
 		scanf("%d", &sceltaMenu);
@@ -394,6 +395,10 @@ void gestioneAllievo()
 
 			}
 		}
+
+		mysql_close(con);
+		exit(EXIT_SUCCESS);
+
 }
 
 void gestioneSegreteria()
@@ -406,7 +411,7 @@ void gestioneSegreteria()
 		printf("1 - Attiva un nuovo corso\n");
 		printf("2 - Iscrizione di un nuovo allievo\n");
 		printf("3 - Assegnazione di un insegnante a un corso\n");
-		printf("4 - Attivazione di una attività culturale\n");
+		printf("4 - Attivazione di una attivitï¿½ culturale\n");
 		printf("5 - Report mensile \n");
 		printf("6 - Nuovo anno \n");
 		printf("0 - Termina il programma \n");
@@ -643,7 +648,12 @@ void gestioneSegreteria()
 			break;
 
 		}
-		exit(EXIT_SUCCESS);
+
+
 
 	}
+
+	mysql_close(con);
+	exit(EXIT_SUCCESS);
+
 }
