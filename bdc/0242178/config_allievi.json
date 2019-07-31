@@ -1,0 +1,7 @@
+{
+  "host": "localhost",
+  "username": "user-allievi",
+  "password": "allievipwd",
+  "port": 3306,
+  "database": "gestione_lingue_straniere"
+}

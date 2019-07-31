@@ -1,0 +1,7 @@
+{
+  "host": "localhost",
+  "username": "user-segreteria",
+  "password": "segreteriapwd",
+  "port": 3306,
+  "database": "gestione_lingue_straniere"
+}

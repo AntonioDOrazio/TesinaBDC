@@ -1,0 +1,7 @@
+{
+  "host": "localhost",
+  "username": "user-insegnanti",
+  "password": "insegnantipwd",
+  "port": 3306,
+  "database": "gestione_lingue_straniere"
+}

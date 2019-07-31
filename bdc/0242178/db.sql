@@ -1,7 +1,17 @@
 -- Sostituire poi con gli utenti veri
 CREATE USER 'test-user'@'localhost' IDENTIFIED BY 'testtest';
 GRANT ALL PRIVILEGES ON * . * TO 'test-user'@'localhost';
+
+CREATE USER 'user-insegnanti'@'localhost' IDENTIFIED BY 'insegnantipwd';
+GRANT ALL PRIVILEGES ON * . * TO 'user-insegnanti'@'localhost';
+
+CREATE USER 'user-allievi'@'localhost' IDENTIFIED BY 'allievipwd';
+GRANT ALL PRIVILEGES ON * . * TO 'user-allievi'@'localhost';
+
+CREATE USER 'user-segreteria'@'localhost' IDENTIFIED BY 'segreteriapwd';
+GRANT ALL PRIVILEGES ON * . * TO 'user-segreteria'@'localhost';
 FLUSH PRIVILEGES;
+
 
 
 DROP SCHEMA IF EXISTS `gestione_lingue_straniere`;

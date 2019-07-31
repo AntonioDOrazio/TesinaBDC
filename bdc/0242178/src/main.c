@@ -25,8 +25,9 @@ static void finish_with_error(MYSQL *con, char *err)
 void gestioneInsegnante();
 void gestioneAllievo();
 void gestioneSegreteria();
+void connessioneDB(char *nomeFile);
 
-char q[256];
+char q[512];
 
 MYSQL *con;
 MYSQL_RES *result;
@@ -34,36 +35,17 @@ MYSQL_ROW row;
 MYSQL_FIELD *field;
 int id, num_fields;
 
+
+char curr_session[11];
+
+
 int main(int argc, char *argv[])
 {
 
-	con = mysql_init(NULL);
 
 	// manca create database 	
-
-	load_file(&config, "config.json");
-	parse_config();
-	dump_config();
-
-
-	if(con == NULL) {
-		fprintf(stderr, "Initilization error: %s\n", mysql_error(con));
-		exit(1);
-	}
-
-	if(mysql_real_connect(con, conf.host, conf.username, conf.password, NULL, conf.port, NULL, 0) == NULL) {
-		finish_with_error(con, "Connection");
-	}
-
-
-	char use_query[128] = "USE ";
-	strncat(use_query, conf.database, 128);
-	use_query[127] = '\0';
-	if(mysql_query(con, use_query)) {
-		finish_with_error(con, "Use");
-	}
-
 	int sceltaMenu = 0;
+	char configFile[32];
 
 	printf("### Gestionale Scuola Di Inglese ### \n");
 
@@ -77,12 +59,18 @@ mainMenu:
 	scanf("%d", &sceltaMenu);
 	switch (sceltaMenu){
 		case 1:
+			strcpy(configFile, "config_insegnanti.json");
+			connessioneDB(configFile);
 			gestioneInsegnante();
 			break;
-		case 2: 
+		case 2:
+			strcpy(configFile, "config_allievi.json");
+			connessioneDB(configFile);
 			gestioneAllievo();
 			break;
 		case 3:
+			strcpy(configFile, "config_segreteria.json");
+			connessioneDB(configFile);
 			gestioneSegreteria();
 			break;
 		default:
@@ -96,12 +84,12 @@ mainMenu:
 
 void gestioneInsegnante()
 {
-	char curr_session[11];
 	int sceltaMenu = 0;
 	char cf[11];
 	char pwd[30];
 
 loginInsegnante:
+
 	printf("Inserisci il tuo codice fiscale\n");
 	scanf("%s", cf);
 
@@ -109,24 +97,23 @@ loginInsegnante:
 	scanf("%s", pwd);
 
 	// Query 
-	snprintf(q, 256, "SELECT cf FROM Insegnanti WHERE cf = '%s' AND pwd = MD5('%s')", cf, pwd);
+	snprintf(q, 512, "SELECT cf FROM Insegnanti WHERE cf = '%s' AND pwd = MD5('%s')", cf, pwd);
 	query(q);
 
+
 	result = mysql_store_result(con);
-	if (result == NULL) {
-		printf("Autenticazione fallita");
+	if (result == NULL || mysql_num_rows(result) == 0) {
+		printf("Autenticazione fallita \n");
 		goto loginInsegnante;
 	}
 	mysql_free_result(result);
-
 
 	strcpy(curr_session, cf);
 	printf("Benvenuto %s. Ecco la lista dei suoi impegni\n", curr_session);
 
 
-
-	snprintf(q, 256, "SELECT CF_Insegnante,  Cognome,  Nome,  Giorno,  Ora,  Aula, Tipologia FROM Impegni_Insegnante WHERE CF_Insegnante = '%s'", cf);
-	query("SELECT CF_Insegnante,  Cognome,  Nome,  Giorno,  Ora,  Aula, Tipologia FROM Impegni_Insegnante WHERE CF_Insegnante = 'AAAAAAAAAAAAAAAA'");
+	snprintf(q, 512, "SELECT CF_Insegnante,  Cognome,  Nome,  Giorno,  Ora,  Aula, Tipologia FROM Impegni_Insegnante WHERE CF_Insegnante = '%s'", cf);
+	query(q);
 	
 	result = mysql_store_result(con);
 	if (result == NULL) {
@@ -160,6 +147,9 @@ void gestioneAllievo()
 	char cf[17];
 	char pwd[30];
 
+	// Query 
+
+loginAllievo:
 	printf("Inserisci il tuo codice fiscale\n");
 	scanf("%s", cf);
 
@@ -167,12 +157,24 @@ void gestioneAllievo()
 	scanf("%s", pwd);
 
 	// Query 
+	snprintf(q, 512, "SELECT cf FROM Allievi WHERE cf = '%s' AND pwd = MD5('%s')", cf, pwd);
+	query(q);
 
+	result = mysql_store_result(con);
+
+	if (result == NULL || mysql_num_rows(result) == 0) {
+		printf("Autenticazione fallita \n");
+		goto loginAllievo;
+	}
+
+	mysql_free_result(result);
+
+	strcpy(curr_session, cf);
 
  	while(sceltaMenu != 0) 
  	{
-		printf("Benvenuto %s. Scegli l'operazione\n", cf);
-		printf("1 - Iscrizione ad attivit�\n");
+		printf("Benvenuto %s. Scegli l'operazione\n", curr_session);
+		printf("1 - Iscrizione ad attivita\n");
 		printf("2 - Prenotazione lezione privata\n");
 		printf("3 - Lista lezioni private\n");
 		printf("4 - Lista iscrizioni ad attivit�\n");
@@ -239,7 +241,7 @@ void gestioneAllievo()
 				printf("Inserisci il codice dell'attivita desiderata >>");
 				scanf("%d", &cod_att);
 
-				snprintf(q, 256, "CALL Prenotazione_Attivita(%d, '%s', %d,", tipologia, cf, cod_att);
+				snprintf(q, 512, "CALL Prenotazione_Attivita(%d, '%s', %d,", tipologia, cf, cod_att);
 				query(q);
 
 				printf("Prenotazione eseguita. \n"); 
@@ -296,7 +298,7 @@ void gestioneAllievo()
 				sprintf (ora_format, "%d:00:00", ora);
 				sprintf (data_format, "%d-%d-%d", anno, mese, giorno);
 
-				snprintf(q, 256, "INSERT INTO Lezioni_Private(insegnante, allievo, giorno, ora) VALUES ('%s','%s','%s','%s')" , cf_insegnante, cf, data_format, ora_format);
+				snprintf(q, 512, "INSERT INTO Lezioni_Private(insegnante, allievo, giorno, ora) VALUES ('%s','%s','%s','%s')" , cf_insegnante, cf, data_format, ora_format);
 				query(q);
 
 
@@ -304,7 +306,7 @@ void gestioneAllievo()
 
 			case 3:
 
-				snprintf(q, 256, "SELECT * FROM Lezioni_Private WHERE allievo = '%s'", cf);
+				snprintf(q, 512, "SELECT * FROM Lezioni_Private WHERE allievo = '%s'", cf);
 				query(q);
 					
 				result = mysql_store_result(con);
@@ -333,7 +335,7 @@ void gestioneAllievo()
 				printf("Proiezioni prenotate \n");
 				
 				
-				snprintf(q, 256, "SELECT  p.codice AS codice, p.giorno AS giorno, p.ora AS ora, p.film AS film, p.cognome_regista AS cognome_regista, p.nome_regista AS nome_regista AS FROM ProiezioniCompleta p JOIN Prenotazioni_Proiezioni pre ON p.codice = pre.codice_proiezione WHERE pre.allievo = '%s'", cf);
+				snprintf(q, 512, "SELECT  p.codice AS codice, p.giorno AS giorno, p.ora AS ora, p.film AS film, p.cognome_regista AS cognome_regista, p.nome_regista AS nome_regista AS FROM ProiezioniCompleta p JOIN Prenotazioni_Proiezioni pre ON p.codice = pre.codice_proiezione WHERE pre.allievo = '%s'", cf);
 				query(q);
 
 				result = mysql_store_result(con);
@@ -360,7 +362,7 @@ void gestioneAllievo()
 
 				printf("Conferenze prenotate \n");
 
-				snprintf(q, 256, "SELECT  c.codice AS codice, c.giorno AS giorno, c.ora AS ora, c.argomento AS argomento, c.cognome_conferenziere AS cognome_conferenziere, c.nome_conferenziere AS nome_conferenziere FROM ConferenzeComleta c JOIN Prenotazioni_Conferenze pre ON p.codice = pre.codice_conferenza WHERE pre.allievo = '%s'", cf);
+				snprintf(q, 512, "SELECT  c.codice AS codice, c.giorno AS giorno, c.ora AS ora, c.argomento AS argomento, c.cognome_conferenziere AS cognome_conferenziere, c.nome_conferenziere AS nome_conferenziere FROM ConferenzeComleta c JOIN Prenotazioni_Conferenze pre ON p.codice = pre.codice_conferenza WHERE pre.allievo = '%s'", cf);
 
 				query(q);
 
@@ -430,7 +432,7 @@ void gestioneSegreteria()
 			char categoria[30];
 			scanf("%s", categoria);
 
-			snprintf(q, 256, "INSERT INTO Corsi(livello, data_creazione) VALUES ('%s', CURDATE())", categoria);
+			snprintf(q, 512, "INSERT INTO Corsi(livello, data_creazione) VALUES ('%s', CURDATE())", categoria);
 			query(q);
 
 			printf("Corso di tipo %s attivato\n", categoria);
@@ -460,7 +462,7 @@ void gestioneSegreteria()
 			printf("Id del corso >> ");
 			scanf("%d", &corso_allievo);
 			
-			snprintf(q, 256, "INSERT INTO Allievi(cf, pwd, cognome, nome, telefono, corso, data_iscrizione) VALUES('%s', MD5('%s'), '%s', '%s', '%s', %d, CURDATE())", cf_allievo, pwd_allievo, cognome_allievo, nome_allievo, telefono_allievo, corso_allievo);
+			snprintf(q, 512, "INSERT INTO Allievi(cf, pwd, cognome, nome, telefono, corso, data_iscrizione) VALUES('%s', MD5('%s'), '%s', '%s', '%s', %d, CURDATE())", cf_allievo, pwd_allievo, cognome_allievo, nome_allievo, telefono_allievo, corso_allievo);
 			query(q);
 
 			printf("Alunno %s registrato \n", cf_allievo);
@@ -526,7 +528,7 @@ void gestioneSegreteria()
 			printf("ID del corso >> ");
 			scanf("%d", &id_corso);
 
-			snprintf(q, 256, "INSERT INTO Docenze(insegnante, corso) VALUES ('%s', %d)", cf_insegnante, id_corso);
+			snprintf(q, 512, "INSERT INTO Docenze(insegnante, corso) VALUES ('%s', %d)", cf_insegnante, id_corso);
 			query(q);
 
 			printf("Docente assegnato \n");
@@ -594,7 +596,7 @@ void gestioneSegreteria()
 			sprintf (ora_format, "%d:00:00", ora);
 			sprintf (data_format, "%d-%d-%d", anno, mese, giorno);
 
-			snprintf(q, 256, "CALL Nuova_Attivita('%d','%s','%s','%s','%s','%s');", tipologia, data_format, ora_format, titolo, cognome_aut, nome_aut);
+			snprintf(q, 512, "CALL Nuova_Attivita('%d','%s','%s','%s','%s','%s');", tipologia, data_format, ora_format, titolo, cognome_aut, nome_aut);
 			query(q);
 
 			printf("Attivita creata. \n");
@@ -655,5 +657,34 @@ void gestioneSegreteria()
 
 	mysql_close(con);
 	exit(EXIT_SUCCESS);
+
+}
+
+void connessioneDB(char *nomeFile)
+{
+	con = mysql_init(NULL);
+
+	load_file(&config, nomeFile);
+	parse_config();
+	dump_config();
+
+	if(con == NULL) {
+		fprintf(stderr, "Initilization error: %s\n", mysql_error(con));
+		exit(1);
+	}
+
+	if(mysql_real_connect(con, conf.host, conf.username, conf.password, NULL, conf.port, NULL, 0) == NULL) {
+		finish_with_error(con, "Connection");
+	}
+
+	char use_query[128] = "USE ";
+	strncat(use_query, conf.database, 128);
+	use_query[127] = '\0';
+	if(mysql_query(con, use_query)) {
+		finish_with_error(con, "Use");
+	}
+
+	//TODO verificare se si puocancellare (se non interferisce)
+	//mysql_free_result(result);
 
 }
