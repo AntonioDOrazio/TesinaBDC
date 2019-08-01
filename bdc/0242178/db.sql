@@ -29,7 +29,7 @@ CREATE TABLE `Corsi`
 (
 	codice INTEGER PRIMARY KEY AUTO_INCREMENT, 
     livello VARCHAR(30),
-    data_creazione DATE,
+    data_attivazione DATE,
     FOREIGN KEY(livello) REFERENCES Livelli(denominazione)
 );
 
@@ -99,41 +99,33 @@ CREATE TABLE `Assenze`
     FOREIGN KEY (aula, giorno, ora) REFERENCES Lezioni(aula, giorno, ora)
 );
 
-CREATE TABLE `Film`
+
+CREATE TABLE 'Registi'
 (
-    titolo VARCHAR(60),
+	id_regista INTEGER PRIMARY KEY AUTO_INCREMENT,
     cognome_regista VARCHAR(30),
     nome_regista VARCHAR(30),
-    PRIMARY KEY(titolo, cognome_regista)
 );
 
-CREATE TABLE `Argomenti_Conferenze`
+
+CREATE TABLE `Film`
 (
-    argomento VARCHAR(60),
-    cognome_conferenziere VARCHAR(30),
-    nome_conferenziere VARCHAR(30),
-    PRIMARY KEY(argomento, cognome_conferenziere)
+	id_film INTEGER PRIMARY KEY AUTO_INCREMENT,
+    titolo VARCHAR(60),
+    regista INTEGER,
+    FOREIGN KEY(regista) REFERENCES Registi(id_regista)
 );
+
 
 CREATE TABLE `Proiezioni`
 (
 	codice INTEGER PRIMARY KEY AUTO_INCREMENT,
     giorno DATE,
     ora TIME,
-    film VARCHAR(60),
-    cognome_regista VARCHAR(30),
-    FOREIGN KEY(film, cognome_regista) REFERENCES Film(titolo, cognome_regista)
+    film INTEGER,
+    FOREIGN KEY(film) REFERENCES Film(id_film)
 );
 
-CREATE TABLE `Conferenze`
-(
-	codice INTEGER PRIMARY KEY AUTO_INCREMENT,
-    giorno DATE,
-    ora TIME,
-    argomento VARCHAR(60),
-    cognome_conferenziere VARCHAR(30),
-    FOREIGN KEY(argomento, cognome_conferenziere) REFERENCES Argomenti_Conferenze(argomento, cognome_conferenziere)
-);
 
 CREATE TABLE `Prenotazioni_Proiezioni`
 (
@@ -143,6 +135,34 @@ CREATE TABLE `Prenotazioni_Proiezioni`
     FOREIGN KEY (allievo) REFERENCES Allievi(cf),
     FOREIGN KEY (codice_proiezione) REFERENCES Proiezioni(codice)
 );
+
+
+CREATE TABLE `Conferenzieri`(
+	id_conferenziere INTEGER PRIMARY KEY AUTO_INCREMENT,
+    cognome_conferenziere VARCHAR(30),
+    nome_conferenziere VARCHAR(30),
+);
+
+CREATE TABLE `Argomenti_Conferenze`
+(
+    id_argomento_conf INTEGER PRIMARY KEY AUTO_INCREMENT,
+	argomento VARCHAR(60),
+	conferenziere INTEGER,
+    FOREIGN KEY(conferenziere) REFERENCES Conferenzieri(id_conferenziere)
+);
+
+
+
+CREATE TABLE `Conferenze`
+(
+	codice INTEGER PRIMARY KEY AUTO_INCREMENT,
+    giorno DATE,
+    ora TIME,
+    argomento INTEGER,
+    FOREIGN KEY(argomento) REFERENCES Argomenti_Conferenze(id_argomento_conf)
+);
+
+
 
 CREATE TABLE `Prenotazioni_Conferenze`
 (
