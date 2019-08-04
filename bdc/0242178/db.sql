@@ -1,19 +1,3 @@
--- Sostituire poi con gli utenti veri
-CREATE USER 'test-user'@'localhost' IDENTIFIED BY 'testtest';
-GRANT ALL PRIVILEGES ON * . * TO 'test-user'@'localhost';
-
-CREATE USER 'user-insegnanti'@'localhost' IDENTIFIED BY 'insegnantipwd';
-GRANT ALL PRIVILEGES ON * . * TO 'user-insegnanti'@'localhost';
-
-CREATE USER 'user-allievi'@'localhost' IDENTIFIED BY 'allievipwd';
-GRANT ALL PRIVILEGES ON * . * TO 'user-allievi'@'localhost';
-
-CREATE USER 'user-segreteria'@'localhost' IDENTIFIED BY 'segreteriapwd';
-GRANT ALL PRIVILEGES ON * . * TO 'user-segreteria'@'localhost';
-FLUSH PRIVILEGES;
-
-
-
 DROP SCHEMA IF EXISTS `gestione_lingue_straniere`;
 CREATE SCHEMA `gestione_lingue_straniere`;
 USE `gestione_lingue_straniere`; 
@@ -410,6 +394,25 @@ END $$
 
 
 
+CREATE USER 'user-insegnanti'@'localhost' IDENTIFIED BY 'insegnantipwd';
+GRANT SELECT PRIVILEGES ON gestione_lingue_straniere.allievi TO 'user-insegnanti'@'localhost';
+GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.lezioni_private  TO 'user-insegnanti'@'localhost';
+GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.Assenze  TO 'user-insegnanti'@'localhost';
+GRANT SELECT PRIVILEGES ON gestione_lingue_straniere.lezione  TO 'user-insegnanti'@'localhost';
+
+
+
+CREATE USER 'user-allievi'@'localhost' IDENTIFIED BY 'allievipwd';
+GRANT SELECT PRIVILEGES ON gestione_lingue_straniere.allievi TO 'user-allievi'@'localhost';
+GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.Prenotazioni_Conferenze TO 'user-allievi'@'localhost';
+GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.Prenotazioni_Proiezioni TO 'user-allievi'@'localhost';
+GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.Lezioni_Private TO 'user-allievi'@'localhost';
+
+CREATE USER 'user-segreteria'@'localhost' IDENTIFIED BY 'segreteriapwd';
+GRANT ALL PRIVILEGES ON * . * TO 'user-segreteria'@'localhost';
+
+FLUSH PRIVILEGES;
+
 INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario)
 VALUES('Intermediate', 'Cambridge Book', TRUE);
 
@@ -425,10 +428,8 @@ INSERT INTO Corsi(Livello) VALUES('Intermediate');
 
 INSERT INTO Docenze(insegnante, corso) VALUES ('AAAAAAAAAAAAAAAA', 1);
 
-CALL `gestione_lingue_straniere`.`Nuova_Attivita`(0, '2019-4-4', '7:00:00', 'gOODByeLenIn', 'cAPATONDA', 'MACCIO');
-
-CALL `gestione_lingue_straniere`.`Nuova_Attivita`(1, '2019-4-4', '7:00:00', 'gOODByeLenInMaIspROIEZIONE', 'cAPATONDA', 'MACCIO');
-
+CALL `gestione_lingue_straniere`.`Nuova_Attivita`(0, '2019-10-4', '7:00:00', 'Orwell 1984', 'Radford', 'Michael');
+CALL `gestione_lingue_straniere`.`Nuova_Attivita`(1, '2019-10-4', '7:00:00', 'About English Language', 'Reds', 'Mario');
 
 
 COMMIT;
