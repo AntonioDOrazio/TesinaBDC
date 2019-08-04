@@ -205,15 +205,16 @@ FROM Allievi a JOIN Lezioni_Private  lp ON lp.allievo = a.cf
 DROP VIEW IF EXISTS PrenotazioniAttive;
 CREATE VIEW PrenotazioniAttive
 AS
-(SELECT pren.allievo AS CF_studente, 'Proiezione' AS Tipologia, pro.giorno AS Giorno, pro.ora AS Ora, pro.film AS TitoloArgomento, pro.cognome_regista AS CognomeAutore, f.nome_regista AS NomeAutore
+(SELECT pren.allievo AS CF_studente, 'Proiezione' AS Tipologia, pro.giorno AS Giorno, pro.ora 
+AS Ora, pro.film AS TitoloArgomento, reg.cognome_regista AS CognomeAutore, reg.nome_regista AS NomeAutore
 FROM Prenotazioni_Proiezioni pren JOIN Proiezioni pro ON pren.codice_proiezione = pro.codice 
-    JOIN Film f ON (pro.film = f.titolo AND pro.cognome_regista = f.cognome_regista))
+    JOIN Film f ON pro.film = f.id_film JOIN registi reg ON f.regista = reg.id_regista)
 UNION
 (SELECT pren.allievo AS CF_studente, 'Conferenza' AS Tipologia, c.giorno AS Giorno, c.ora 
-	AS Ora, c.argomento AS TitoloArgomento, c.cognome_conferenziere 
-    AS CognomeAutore, a.nome_conferenziere AS NomeAutore
+	AS Ora, c.argomento AS TitoloArgomento, conf.cognome_conferenziere 
+    AS CognomeAutore, conf.nome_conferenziere AS NomeAutore
 FROM Prenotazioni_Conferenze pren JOIN Conferenze c ON pren.codice_conferenza = c.codice 
-    JOIN Argomenti_Conferenze a ON (c.argomento = a.argomento AND c.cognome_conferenziere = a.cognome_conferenziere))
+    JOIN Argomenti_Conferenze a ON c.argomento = a.argomento JOIN conferenzieri conf ON a.conferenziere = conf.id_conferenziere )
 ORDER BY Giorno, Ora, TitoloArgomento;
 
 
@@ -223,8 +224,8 @@ DROP VIEW IF EXISTS ProiezioniCompleta;
 CREATE VIEW ProiezioniConFilm
 AS
 (
-	SELECT  p.codice AS codice, p.giorno AS giorno, p.ora AS ora, p.film AS film, p.cognome_regista AS cognome_regista, f.nome_regista AS nome_regista
-	FROM Proiezioni p JOIN Film f ON p.film = f.titolo AND p.cognome_regista = f.nome_regista 
+	SELECT  p.codice AS codice, p.giorno AS giorno, p.ora AS ora, p.film AS film, reg.cognome_regista AS cognome_regista, reg.nome_regista AS nome_regista
+	FROM Proiezioni p JOIN Film f ON p.film = f.id_film JOIN Registi reg ON f.regista = reg.id_regista
 );
 
 
@@ -232,8 +233,8 @@ DROP VIEW IF EXISTS ConferenzeCompleta;
 CREATE VIEW ConferenzeCompleta
 AS
 (
-	SELECT  c.codice AS codice, c.giorno AS giorno, c.ora AS ora, c.argomento AS argomento, c.cognome_conferenziere AS cognome_conferenziere, ac.nome_conferenziere AS nome_conferenziere
-	FROM Conferenze c JOIN Argomenti_Conferenze ac ON c.argomento = c.argomento AND c.cognome_conferenziere = ac.cognome_conferenziere
+	SELECT  c.codice AS codice, c.giorno AS giorno, c.ora AS ora, c.argomento AS argomento, conf.cognome_conferenziere AS cognome_conferenziere, conf.nome_conferenziere AS nome_conferenziere
+	FROM Conferenze c JOIN Argomenti_Conferenze ac ON c.argomento = ac.id_argomento_conf JOIN conferenzieri conf ON ac.conferenziere = conf.id_conferenziere
 );
 
 
@@ -291,26 +292,79 @@ END $$
 
 CREATE PROCEDURE Nuova_Attivita(IN TIPOLOGIA INTEGER, IN giorno_in DATE, IN ora_in TIME, IN argfilm_in VARCHAR(60), IN cognome_in VARCHAR(30), IN nome_in VARCHAR(30))
 BEGIN
+
+	DECLARE idautore INTEGER;
+    DECLARE idopera INTEGER;
+
 	-- Se è una proiezione
 	IF TIPOLOGIA = 0 THEN
-		-- Se la proiezione si riferisce ad un nuovo film ne inserisco uno nuovo
-		IF nome_in IS NOT NULL THEN
-			INSERT INTO Film(titolo, cognome_regista, nome_regista)
-			VALUES (argfilm_in, cognome_in, nome_in);
-		END IF;
-		    INSERT INTO Proiezioni(giorno, ora, film, cognome_regista)
-			VALUES(giorno_in, ora_in, argfilm_in, cognome_in);
-
-	-- Se è una conferenza
+		-- Verifico esistenza regista sul db
+        SELECT id_regista INTO idautore
+        FROM registi
+        WHERE cognome_regista = cognome_in
+        AND nome_regista = nome_in;
+        
+        IF idautore IS NULL THEN
+        
+			INSERT INTO Registi(cognome_regista, nome_regista)
+            VALUES (cognome_in, nome_in);
+            
+			SET idautore = LAST_INSERT_ID();    
+            
+        END IF;
+        
+		SELECT id_film INTO idopera
+		FROM film
+		WHERE titolo = argfilm_in
+		AND regista = idautore;
+      
+		-- Verifico esistenza film sul db
+        IF idopera IS NULL THEN
+        
+			INSERT INTO Film(titolo, regista)
+            VALUES (argfilm_in, idautore);
+            
+            SET idopera = LAST_INSERT_ID();
+        
+        END IF;
+        
+        INSERT INTO proiezioni(giorno, ora, film)
+        VALUES (giorno_in, ora_in, idopera);
+        
+	-- Se è una conferenza TODO
 	ELSEIF TIPOLOGIA = 1 THEN
 
-		IF nome_in IS NOT NULL THEN
-			INSERT INTO Argomenti_Conferenze(argomento, cognome_conferenziere, nome_conferenziere)
-			VALUES (argfilm_in, cognome_in, nome_in);
-		END IF;
-		    INSERT INTO Conferenze(giorno, ora, argomento, cognome_conferenziere)
-			VALUES(giorno_in, ora_in, argfilm_in, cognome_in);
-
+     SELECT id_conferenziere INTO idautore
+        FROM conferenzieri
+        WHERE cognome_conferenziere = cognome_in
+        AND nome_conferenziere = nome_in;
+        
+        IF idautore IS NULL THEN
+        
+			INSERT INTO Conferenzieri(cognome_conferenziere, nome_conferenziere)
+            VALUES (cognome_in, nome_in);
+            
+			SET idautore = LAST_INSERT_ID();    
+            
+        END IF;
+        
+		SELECT id_argomento_conf INTO idopera
+		FROM argomenti_conferenze
+		WHERE argomento = argfilm_in
+		AND conferenziere = idautore;
+      
+		-- Verifico esistenza film sul db
+        IF idopera IS NULL THEN
+        
+			INSERT INTO Argomenti_Conferenze(argomento, conferenziere)
+            VALUES (argfilm_in, idautore);
+            
+            SET idopera = LAST_INSERT_ID();
+        
+        END IF;
+        
+        INSERT INTO conferenze(giorno, ora, argomento)
+        VALUES (giorno_in, ora_in, idopera);
 	ELSE
 		ROLLBACK;
 	END IF;
