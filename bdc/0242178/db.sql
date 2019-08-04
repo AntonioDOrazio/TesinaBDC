@@ -100,11 +100,11 @@ CREATE TABLE `Assenze`
 );
 
 
-CREATE TABLE 'Registi'
+CREATE TABLE `Registi`
 (
 	id_regista INTEGER PRIMARY KEY AUTO_INCREMENT,
     cognome_regista VARCHAR(30),
-    nome_regista VARCHAR(30),
+    nome_regista VARCHAR(30)
 );
 
 
@@ -140,7 +140,7 @@ CREATE TABLE `Prenotazioni_Proiezioni`
 CREATE TABLE `Conferenzieri`(
 	id_conferenziere INTEGER PRIMARY KEY AUTO_INCREMENT,
     cognome_conferenziere VARCHAR(30),
-    nome_conferenziere VARCHAR(30),
+    nome_conferenziere VARCHAR(30)
 );
 
 CREATE TABLE `Argomenti_Conferenze`
@@ -201,7 +201,7 @@ SELECT a.cf AS CF_Allievo, a.cognome AS Cognome_Allievo, a.nome AS Nome_Allievo,
 FROM Allievi a JOIN Lezioni_Private  lp ON lp.allievo = a.cf
 	JOIN Insegnanti i ON lp.insegnante = i.cf;
 
--- Verra usata dagli studenti per consultare le proprie prenotazioni
+-- Verra usata dagli studenti per consultare le proprie prenotazioni //TODO 
 DROP VIEW IF EXISTS PrenotazioniAttive;
 CREATE VIEW PrenotazioniAttive
 AS
