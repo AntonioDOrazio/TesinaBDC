@@ -164,7 +164,7 @@ CREATE TABLE `Prenotazioni_Conferenze`
 
 -- Viste 
 
--- Verra usata per i report, sia dalla segreteria sia dai docenti 
+-- Verra usata per i report, sia dalla segreteria sia dagli insegnanti 
 DROP VIEW IF EXISTS Impegni_Insegnante;
 CREATE VIEW Impegni_Insegnante 
 AS
@@ -180,7 +180,7 @@ FROM Insegnanti i JOIN Docenze d ON i.cf = d.insegnante
 ) 
 ORDER BY Cognome, Nome, Giorno, Ora;
 
--- Verra usata dagli studenti per prenotare una lezione privata
+-- Verra usata dagli allievi per prenotare una lezione privata
 DROP VIEW IF EXISTS Prenotazioni_Lezioni_Private;
 CREATE VIEW Prenotazioni_Lezioni_Private
 AS
@@ -209,7 +209,7 @@ AS
 );
 
 
--- Verra usata dagli studenti per consultare le proprie prenotazioni //TODO 
+-- Verra usata dagli allievi per consultare le proprie prenotazioni //TODO 
 DROP VIEW IF EXISTS PrenotazioniAttive;
 CREATE VIEW PrenotazioniAttive
 AS
@@ -390,7 +390,7 @@ BEGIN
 END $$
 
 
--- Verra usata per i report, sia dalla segreteria sia dai docenti 
+-- Verra usata per i report, sia dalla segreteria sia dagli insegnanti 
 DROP VIEW IF EXISTS Impegni_Insegnante;
 CREATE VIEW Impegni_Insegnante 
 AS
@@ -444,8 +444,8 @@ BEGIN
     WHERE i.CF_Insegnante = NEW.insegnante
 	AND NEW.corso = c.codice
 	AND c.codice = l.corso
-    AND HOUR(NEW.ora) = HOUR(l.ora)
-    AND l.giorno = NEW.giorno
+    AND HOUR(i.ora) = HOUR(l.ora)
+    AND l.giorno = i.giorno
     ) THEN  
     SIGNAL SQLSTATE '12345'
     SET MESSAGE_TEXT = 'Una o piu fasce orarie non disponibili!';
@@ -455,16 +455,14 @@ END; //
 DELIMITER ;
 
 
-
-
-
-
+CREATE INDEX proiezioni_idx ON Proiezioni(giorno, ora);
+CREATE INDEX conferenze_idx ON Conferenze(giorno, ora);
 
 
 COMMIT;
 
-GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Lezioni_Private  TO 'user-insegnanti'@'localhost';
 GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Assenze  TO 'user-insegnanti'@'localhost';
+GRANT SELECT  gestione_lingue_straniere.Lezioni_Private  TO 'user-insegnanti'@'localhost';
 GRANT SELECT  ON gestione_lingue_straniere.Lezioni  TO 'user-insegnanti'@'localhost';
 GRANT SELECT  ON gestione_lingue_straniere.Insegnanti  TO 'user-insegnanti'@'localhost';
 GRANT SELECT  ON gestione_lingue_straniere.Impegni_Insegnante TO 'user-insegnanti'@'localhost';
@@ -483,18 +481,42 @@ GRANT ALL PRIVILEGES ON * . * TO 'user-segreteria'@'localhost';
 
 FLUSH PRIVILEGES;
 
+
+
+-- Popolazione del DB con dei dati di prova
+INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario)
+VALUES('Beginner', 'English for beginners', FALSE);
+
 INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario)
 VALUES('Intermediate', 'Cambridge Book', TRUE);
 
-INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
-VALUES('AAAAAAAAAAAAAAAA', MD5('password'), 'Francesco', 'Rossi', 'Via Roma 25', 'UK');
-INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
-VALUES('QWERTYUIOPASDFGH', md5('pwd'), 'Francesco', 'Rossi', 'Via Roma 25', 'UK');
+INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario)
+VALUES('Advanced', 'Oxford Workbook', TRUE);
 
+
+INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
+VALUES('INSEGNANTE000000', MD5('password'), 'Brock', 'Boris', 'Oxford Street 24', 'UK');
+INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
+VALUES('INSEGNANTE000001', md5('password'), 'Taylor', 'Vincent', 'Cook Square 99', 'AU');
+INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
+VALUES('INSEGNANTE000002', md5('password'), 'Smith', 'Robert', 'Grafton Street 101', 'IE');
+
+CALL `gestione_lingue_straniere`.`ATTIVA_CORSO`('Beginner');
 CALL `gestione_lingue_straniere`.`ATTIVA_CORSO`('Intermediate');
-CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('BBBBBBBBBBBBBBBB', 'pwd', 'Bianchi', 'Valentino', '0660600600', 1);
+CALL `gestione_lingue_straniere`.`ATTIVA_CORSO`('Advanced');
+
+CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000000', 'password', 'Bianchi', 'Valentino', '0660600601', 1);
+CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000001', 'password', 'Rossi', 'Mario', '0660600602', 2);
+CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000002', 'password', 'Verdi', 'Stefano', '0660600603', 3);
+
+
+
 
 INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B2", CURDATE(), NOW(), 1);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("A4", CURDATE(), NOW(), 1);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("3", CURDATE(), NOW(), 1);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("C4", CURDATE(), NOW(), 1);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B15", CURDATE(), NOW(), 1);
 
 INSERT INTO Corsi(Livello) VALUES('Intermediate');
 

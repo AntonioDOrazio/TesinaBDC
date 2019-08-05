@@ -179,7 +179,9 @@ void gestioneAllievo()
 		printf("1 - Iscrizione ad attivita\n");
 		printf("2 - Prenotazione lezione privata\n");
 		printf("3 - Lista lezioni private\n");
-		printf("4 - Lista iscrizioni ad attivit�\n");
+		printf("4 - Lista iscrizioni ad attivita\n");
+		printf("5 - Lista assenze\n");
+
 		printf("0 - Indietro\n");
 
 		scanf("%d", &sceltaMenu);
@@ -343,7 +345,7 @@ void gestioneSegreteria()
 			snprintf(q, 512, "INSERT INTO Allievi(cf, pwd, cognome, nome, telefono, corso, data_iscrizione) VALUES('%s', MD5('%s'), '%s', '%s', '%s', %d, CURDATE())", cf_allievo, pwd_allievo, cognome_allievo, nome_allievo, telefono_allievo, corso_allievo);
 			query(q);
 
-			printf("Alunno %s registrato \n", cf_allievo);
+			printf("Allievo %s registrato \n", cf_allievo);
 
 
 			break;
@@ -371,7 +373,7 @@ void gestioneSegreteria()
 			snprintf(q, 512, "INSERT INTO Docenze(insegnante, corso) VALUES ('%s', %d)", cf_insegnante, id_corso);
 			query(q);
 
-			printf("Docente assegnato \n");
+			printf("Insegnante assegnato \n");
 
 			break;
 
