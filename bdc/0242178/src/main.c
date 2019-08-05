@@ -19,10 +19,13 @@ static void finish_with_error(MYSQL *con, char *err)
 	exit(1);        
 }
 
+
+void menuPrincipale();
 void gestioneInsegnante();
 void gestioneAllievo();
 void gestioneSegreteria();
 void connessioneDB(char *nomeFile);
+void printResult();
 
 char q[512];
 MYSQL *con;
@@ -34,48 +37,16 @@ char curr_session[11];
 
 int main(int argc, char *argv[])
 {
-	int sceltaMenu = 0;
-	char configFile[32];
-
-	printf("### Gestionale Scuola Di Inglese ### \n");
-	while(1)
-	{
-		printf("Selezionare l'utenza desiderata\n");
-		printf("1 - Insegnante\n");
-		printf("2 - Allievo\n");
-		printf("3 - Segreteria\n");
-		printf(">> ");
-
-		scanf("%d", &sceltaMenu);
-		switch (sceltaMenu){
-			case 1:
-				strcpy(configFile, "config_insegnanti.json");
-				connessioneDB(configFile);
-				gestioneInsegnante();
-				break;
-			case 2:
-				strcpy(configFile, "config_allievi.json");
-				connessioneDB(configFile);
-				gestioneAllievo();
-				break;
-			case 3:
-				strcpy(configFile, "config_segreteria.json");
-				connessioneDB(configFile);
-				gestioneSegreteria();
-				break;
-			default:
-				printf("Scelta invalida. Riprovare \n");
-				sceltaMenu = 0;
-		}
-	}
-	return EXIT_SUCCESS;
+	menuPrincipale();
+	
+	exit(EXIT_SUCCESS);
 }
 
 
 void gestioneInsegnante()
 {
-	int sceltaMenu = 0;
-	char cf[11];
+	int sceltaMenu = -1;
+	char cf[17];
 	char pwd[30];
 
 	while(1)
@@ -90,6 +61,7 @@ void gestioneInsegnante()
 		query(q);
 
 		result = mysql_store_result(con);
+
 		if (result == NULL || mysql_num_rows(result) == 0) {
 			printf("Autenticazione fallita \n");
 		} else { break; }
@@ -97,32 +69,81 @@ void gestioneInsegnante()
 	mysql_free_result(result);
 
 	strcpy(curr_session, cf);
-	printf("Benvenuto %s. Ecco la lista dei suoi impegni\n", curr_session);
 
-	snprintf(q, 512, "SELECT CF_Insegnante,  Cognome,  Nome,  Giorno,  Ora,  Aula, Tipologia FROM Impegni_Insegnante WHERE CF_Insegnante = '%s'", cf);
-	query(q);
-	
-	result = mysql_store_result(con);
-	if (result == NULL) {
-		finish_with_error(con, "Select");
-	}
-	num_fields = mysql_num_fields(result);
+	while(1) 
+ 	{
+		printf("Benvenuto %s. Scegli l'operazione\n", curr_session);
+		printf("1 - Lista impegni\n");
+		printf("2 - Segnala assenza\n");
+		scanf("%d", &sceltaMenu);
 
-	// Dump header on screen
-	while(field = mysql_fetch_field(result)) {
-		printf("%s ", field->name);
-	}
-	printf("\n");
-	// Dump data on screen
-	while ((row = mysql_fetch_row(result))) { 
-		for(int i = 0; i < num_fields; i++) {
-			printf("%s ", row[i] ? row[i] : "NULL");
-		} 
-		printf("\n"); 
-	}
-	mysql_free_result(result);
+		switch (sceltaMenu) 
+		{
+			case 0:
+				mysql_close(con);
+				menuPrincipale();
+				break;
+			case 1:
+				printf("Ecco la lista dei suoi impegni\n");
+				snprintf(q, 512, "SELECT CF_Insegnante,  Cognome,  Nome,  Giorno,  Ora,  Aula, Tipologia FROM Impegni_Insegnante WHERE CF_Insegnante = '%s'", cf);
+				query(q);
+				printResult();
 
-	mysql_close(con);
+				break;
+			case 2:
+				printf("Inserimento assenza \n");
+
+				int selezione = -1;
+				char cf_allievo[17];
+				int ora;
+				int giorno;
+				int mese;
+				int anno;
+				char ora_format[9];
+				char data_format[11];
+				char aula[5];
+
+				printf("Selezionare un corso \n");
+
+				snprintf(q, 512, "SELECT c.codice, c.livello, c.data_attivazione FROM Corsi c JOIN Docenze d ON c.codice = d.corso WHERE d.insegnante = '%s'", cf);
+				query(q);
+				printResult();
+
+				printf("Selezionare un corso >> ");
+				scanf("%d", &selezione);
+
+				printf("Elenco lezioni per corso fino ad oggi. \n");
+				
+				snprintf(q, 512, "SELECT l.aula, l.giorno, l.ora FROM Lezioni l WHERE l.corso = %d AND giorno <= DATE(NOW())", selezione);
+				query(q);			
+
+				printResult();
+
+				printf("CF Allievo >> ");
+				scanf("%s", cf_allievo);
+				printf("Ora lezione >> ");
+				scanf("%d", &ora);
+				printf("Giorno lezione >> ");
+				scanf("%d", &giorno);
+				printf("Mese lezione (1-12) >> ");
+				scanf("%d", &mese);
+				printf("Anno lezione >> ");
+				scanf("%d", &anno);
+				printf("Aula >> ");
+				scanf("%s", aula);
+
+				sprintf (ora_format, "%d:00:00", ora);
+				sprintf (data_format, "%d-%d-%d", anno, mese, giorno);
+
+				snprintf(q, 512, "INSERT INTO Assenze(allievo, giorno, ora, aula) VALUES ('%s','%s','%s','%s')" , cf_allievo, data_format, ora_format, aula);
+				query(q);
+
+				printf("Assenza registrata \n");
+
+				break;
+		}
+	}
+
 }
 
 void gestioneAllievo()
@@ -152,20 +173,22 @@ void gestioneAllievo()
 
 	strcpy(curr_session, cf);
 
- 	while(sceltaMenu != 0) 
+ 	while(1) 
  	{
 		printf("Benvenuto %s. Scegli l'operazione\n", curr_session);
 		printf("1 - Iscrizione ad attivita\n");
 		printf("2 - Prenotazione lezione privata\n");
 		printf("3 - Lista lezioni private\n");
 		printf("4 - Lista iscrizioni ad attivit�\n");
-		printf("0 - Termina il programma\n");
+		printf("0 - Indietro\n");
 
 		scanf("%d", &sceltaMenu);
 
 		switch (sceltaMenu) 
 		{
 			case 0:
+				mysql_close(con);
+				menuPrincipale();
 				break;
 			case 1:
 				printf("Che tipo di evento? \n");
@@ -188,33 +211,14 @@ void gestioneAllievo()
 					query("SELECT * FROM ConferenzeCompleta WHERE giorno >= CURDATE()");
 				}
 
-				result = mysql_store_result(con);
-				if (result == NULL) {
-					finish_with_error(con, "Select");
-				}
-
-				num_fields = mysql_num_fields(result);
-
-				// Dump header on screen
-				while(field = mysql_fetch_field(result)) {
-					printf("%s ", field->name);
-				}
-				printf("\n");
-				// Dump data on screen
-				while ((row = mysql_fetch_row(result))) { 
-					for(int i = 0; i < num_fields; i++) {
-						printf("%s ", row[i] ? row[i] : "NULL");
-					} 
-					printf("\n"); 
-				}
-				mysql_free_result(result);
+				printResult();
 
 				int cod_att = -1;
 
 				printf("Inserisci il codice dell'attivita desiderata >>");
 				scanf("%d", &cod_att);
 
-				snprintf(q, 512, "CALL Prenotazione_Attivita(%d, '%s', %d,", tipologia, cf, cod_att);
+				snprintf(q, 512, "CALL Prenotazione_Attivita(%d, '%s', %d)", tipologia, cf, cod_att);
 				query(q);
 
 				printf("Prenotazione eseguita. \n"); 
@@ -223,25 +227,9 @@ void gestioneAllievo()
 			case 2:
 				printf("Elenco degli insegnanti \n");
 				query("SELECT * FROM Insegnanti");
-				result = mysql_store_result(con);
-				if (result == NULL) {
-					finish_with_error(con, "Select");
-				}
-				num_fields = mysql_num_fields(result);
+				printResult();
 
-				// Dump header on screen
-				while(field = mysql_fetch_field(result)) {
-					printf("%s ", field->name);
-				}
-				printf("\n");
-				// Dump data on screen
-				while ((row = mysql_fetch_row(result))) { 
-					for(int i = 0; i < num_fields; i++) {
-						printf("%s ", row[i] ? row[i] : "NULL");
-					} 
-					printf("\n"); 
-				}
-				mysql_free_result(result);
+
 
 				char cf_insegnante[17];
 				int ora;
@@ -272,79 +260,16 @@ void gestioneAllievo()
 			case 3:
 				snprintf(q, 512, "SELECT * FROM Lezioni_Private WHERE allievo = '%s'", cf);
 				query(q);
-					
-				result = mysql_store_result(con);
-				if (result == NULL) {
-					finish_with_error(con, "Select");
-				}
-				num_fields = mysql_num_fields(result);
+				printResult();
 
-				// Dump header on screen
-				while(field = mysql_fetch_field(result)) {
-					printf("%s ", field->name);
-				}
-				printf("\n");
-				// Dump data on screen
-				while ((row = mysql_fetch_row(result))) { 
-					for(int i = 0; i < num_fields; i++) {
-						printf("%s ", row[i] ? row[i] : "NULL");
-					} 
-					printf("\n"); 
-				}
-				mysql_free_result(result);
 			case 4:
 				printf("Proiezioni prenotate \n");
 				
-				snprintf(q, 512, "SELECT  p.codice AS codice, p.giorno AS giorno, p.ora AS ora, p.film AS film, p.cognome_regista AS cognome_regista, p.nome_regista AS nome_regista AS FROM ProiezioniCompleta p JOIN Prenotazioni_Proiezioni pre ON p.codice = pre.codice_proiezione WHERE pre.allievo = '%s'", cf);
-				query(q);
-
-				result = mysql_store_result(con);
-				if (result == NULL) {
-					finish_with_error(con, "Select");
-				}
-
-				num_fields = mysql_num_fields(result);
-
-				// Dump header on screen
-				while(field = mysql_fetch_field(result)) {
-					printf("%s ", field->name);
-				}
-				printf("\n");
-				// Dump data on screen
-				while ((row = mysql_fetch_row(result))) { 
-					for(int i = 0; i < num_fields; i++) {
-						printf("%s ", row[i] ? row[i] : "NULL");
-					} 
-					printf("\n"); 
-				}
-				mysql_free_result(result);
-
-				printf("Conferenze prenotate \n");
-
-				snprintf(q, 512, "SELECT  c.codice AS codice, c.giorno AS giorno, c.ora AS ora, c.argomento AS argomento, c.cognome_conferenziere AS cognome_conferenziere, c.nome_conferenziere AS nome_conferenziere FROM ConferenzeComleta c JOIN Prenotazioni_Conferenze pre ON p.codice = pre.codice_conferenza WHERE pre.allievo = '%s'", cf);
+				snprintf(q, 512, "SELECT * FROM PrenotazioniAttive WHERE CF_allievo = '%s'", cf);
 
 				query(q);
 
-				result = mysql_store_result(con);
-				if (result == NULL) {
-					finish_with_error(con, "Select");
-				}
-
-				num_fields = mysql_num_fields(result);
-
-				// Dump header on screen
-				while(field = mysql_fetch_field(result)) {
-					printf("%s ", field->name);
-				}
-				printf("\n");
-				// Dump data on screen
-				while ((row = mysql_fetch_row(result))) { 
-					for(int i = 0; i < num_fields; i++) {
-						printf("%s ", row[i] ? row[i] : "NULL");
-					} 
-					printf("\n"); 
-				}
-				mysql_free_result(result);				
+				printResult();		
 
 				break;
 
@@ -353,17 +278,13 @@ void gestioneAllievo()
 				break;
 			}
 		}
-
-		mysql_close(con);
-		exit(EXIT_SUCCESS);
-
 }
 
 void gestioneSegreteria()
 {
 	int sceltaMenu = -1;
 
-	while (sceltaMenu != 0) {
+	while (1) {
 		printf("Gestione segreteria. Scegli l'operazione \n");
 		printf("1 - Attiva un nuovo corso\n");
 		printf("2 - Iscrizione di un nuovo allievo\n");
@@ -371,15 +292,17 @@ void gestioneSegreteria()
 		printf("4 - Attivazione di una attivit� culturale\n");
 		printf("5 - Report mensile \n");
 		printf("6 - Nuovo anno \n");
-		printf("0 - Termina il programma \n");
+		printf("0 - Menu principale \n");
 		printf(">> ");
 		scanf("%d", &sceltaMenu);
 
 		switch (sceltaMenu) {
 
 		case 0:
+			mysql_close(con);
+			menuPrincipale();
 			break;
-
+		
 		case 1:
 
 			printf("Inserisci il livello del corso da attivare\n");
@@ -430,50 +353,12 @@ void gestioneSegreteria()
 
 			query("SELECT * FROM Insegnanti");
 			
-			result = mysql_store_result(con);
-			if (result == NULL) {
-				finish_with_error(con, "Select");
-			}
-
-			num_fields = mysql_num_fields(result);
-
-			// Dump header on screen
-			while(field = mysql_fetch_field(result)) {
-				printf("%s ", field->name);
-			}
-			printf("\n");
-			// Dump data on screen
-			while ((row = mysql_fetch_row(result))) { 
-				for(int i = 0; i < num_fields; i++) {
-					printf("%s ", row[i] ? row[i] : "NULL");
-				} 
-				printf("\n"); 
-			}
-			mysql_free_result(result);
+			printResult();
 
 			printf("Elenco dei corsi attivi \n");
 
 			query("SELECT * FROM Corsi");
-			result = mysql_store_result(con);
-			if (result == NULL) {
-				finish_with_error(con, "Select");
-			}
-
-			num_fields = mysql_num_fields(result);
-
-			// Dump header on screen
-			while(field = mysql_fetch_field(result)) {
-				printf("%s ", field->name);
-			}
-			printf("\n");
-			// Dump data on screen
-			while ((row = mysql_fetch_row(result))) { 
-				for(int i = 0; i < num_fields; i++) {
-					printf("%s ", row[i] ? row[i] : "NULL");
-				} 
-				printf("\n"); 
-			}
-			mysql_free_result(result);
+			printResult();
 
 			char cf_insegnante[17];
 			int id_corso;
@@ -491,8 +376,7 @@ void gestioneSegreteria()
 			break;
 
 		case 4:
-
-			printf("");
+			printf("Attivazione attivita culturale \n");
 
 			int tipologia = -1;
 
@@ -547,26 +431,7 @@ void gestioneSegreteria()
 		case 5:
 			query("SELECT CF_Insegnante,  Cognome,  Nome,  Giorno,  Ora,  Aula, Tipologia FROM Impegni_Insegnante ORDER BY CF_Insegnante, Giorno, Ora");
 			
-			result = mysql_store_result(con);
-			if (result == NULL) {
-				finish_with_error(con, "Select");
-			}
-
-			num_fields = mysql_num_fields(result);
-
-			// Dump header on screen
-			while(field = mysql_fetch_field(result)) {
-				printf("%s ", field->name);
-			}
-			printf("\n");
-			// Dump data on screen
-			while ((row = mysql_fetch_row(result))) { 
-				for(int i = 0; i < num_fields; i++) {
-					printf("%s ", row[i] ? row[i] : "NULL");
-				} 
-				printf("\n"); 
-			}
-			mysql_free_result(result);
+			printResult();
 
 			break;
 
@@ -586,8 +451,6 @@ void gestioneSegreteria()
 			break;
 		}
 	}
-	mysql_close(con);
-	exit(EXIT_SUCCESS);
 }
 
 void connessioneDB(char *nomeFile)
@@ -614,4 +477,69 @@ void connessioneDB(char *nomeFile)
 		finish_with_error(con, "Use");
 	}
 	//mysql_free_result(result);
+}
+
+
+void menuPrincipale()
+{
+	char configFile[32];
+	int sceltaMenu = 0;
+
+	printf("### Gestionale Scuola Di Inglese ### \n");
+	while(1)
+	{
+		printf("Selezionare l'utenza desiderata\n");
+		printf("1 - Insegnante\n");
+		printf("2 - Allievo\n");
+		printf("3 - Segreteria\n");
+		printf("0 - Termina il programma \n");
+		printf(">> ");
+		scanf("%d", &sceltaMenu);
+		switch (sceltaMenu){
+			case 1:
+				strcpy(configFile, "config_insegnanti.json");
+				connessioneDB(configFile);
+				gestioneInsegnante();
+				break;
+			case 2:
+				strcpy(configFile, "config_allievi.json");
+				connessioneDB(configFile);
+				gestioneAllievo();
+				break;
+			case 3:
+				strcpy(configFile, "config_segreteria.json");
+				connessioneDB(configFile);
+				gestioneSegreteria();
+				break;
+			case 0:
+				exit(EXIT_SUCCESS);
+				break;
+			default:
+				printf("Scelta invalida. Riprovare \n");
+				sceltaMenu = 0;
+		}
+	}
+}
+
+void printResult()
+{
+	result = mysql_store_result(con);
+	if (result == NULL) {
+		finish_with_error(con, "Select");
+	}
+	num_fields = mysql_num_fields(result);
+
+	// Dump header on screen
+	while(field = mysql_fetch_field(result)) {
+		printf("%s ", field->name);
+	}
+	printf("\n");
+	// Dump data on screen
+	while ((row = mysql_fetch_row(result))) { 
+		for(int i = 0; i < num_fields; i++) {
+			printf("%s ", row[i] ? row[i] : "NULL");
+		} 
+		printf("\n"); 
+	}
+	mysql_free_result(result);
 }

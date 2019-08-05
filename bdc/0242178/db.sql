@@ -1,3 +1,8 @@
+CREATE USER 'user-insegnanti'@'localhost' IDENTIFIED BY 'insegnantipwd';
+CREATE USER 'user-allievi'@'localhost' IDENTIFIED BY 'allievipwd';
+CREATE USER 'user-segreteria'@'localhost' IDENTIFIED BY 'segreteriapwd';
+
+
 DROP SCHEMA IF EXISTS `gestione_lingue_straniere`;
 CREATE SCHEMA `gestione_lingue_straniere`;
 USE `gestione_lingue_straniere`; 
@@ -185,42 +190,34 @@ SELECT a.cf AS CF_Allievo, a.cognome AS Cognome_Allievo, a.nome AS Nome_Allievo,
 FROM Allievi a JOIN Lezioni_Private  lp ON lp.allievo = a.cf
 	JOIN Insegnanti i ON lp.insegnante = i.cf;
 
--- Verra usata dagli studenti per consultare le proprie prenotazioni //TODO 
-DROP VIEW IF EXISTS PrenotazioniAttive;
-CREATE VIEW PrenotazioniAttive
-AS
-(SELECT pren.allievo AS CF_studente, 'Proiezione' AS Tipologia, pro.giorno AS Giorno, pro.ora 
-AS Ora, pro.film AS TitoloArgomento, reg.cognome_regista AS CognomeAutore, reg.nome_regista AS NomeAutore
-FROM Prenotazioni_Proiezioni pren JOIN Proiezioni pro ON pren.codice_proiezione = pro.codice 
-    JOIN Film f ON pro.film = f.id_film JOIN registi reg ON f.regista = reg.id_regista)
-UNION
-(SELECT pren.allievo AS CF_studente, 'Conferenza' AS Tipologia, c.giorno AS Giorno, c.ora 
-	AS Ora, c.argomento AS TitoloArgomento, conf.cognome_conferenziere 
-    AS CognomeAutore, conf.nome_conferenziere AS NomeAutore
-FROM Prenotazioni_Conferenze pren JOIN Conferenze c ON pren.codice_conferenza = c.codice 
-    JOIN Argomenti_Conferenze a ON c.argomento = a.argomento JOIN conferenzieri conf ON a.conferenziere = conf.id_conferenziere )
-ORDER BY Giorno, Ora, TitoloArgomento;
-
-
--- Le seguenti viste ricongiungono Proiezioni/Film e Conferenze/Argomenti_Conferenze
+-- Le seguenti viste ricongiungono Proiezioni/Film/Registi e Conferenze/Argomenti_Conferenze/Conferenzieri
 
 DROP VIEW IF EXISTS ProiezioniCompleta;
-CREATE VIEW ProiezioniConFilm
+CREATE VIEW ProiezioniCompleta
 AS
 (
-	SELECT  p.codice AS codice, p.giorno AS giorno, p.ora AS ora, p.film AS film, reg.cognome_regista AS cognome_regista, reg.nome_regista AS nome_regista
+	SELECT  p.codice AS codice, p.giorno AS giorno, p.ora AS ora, f.titolo AS film, reg.cognome_regista AS cognome_regista, reg.nome_regista AS nome_regista
 	FROM Proiezioni p JOIN Film f ON p.film = f.id_film JOIN Registi reg ON f.regista = reg.id_regista
 );
-
 
 DROP VIEW IF EXISTS ConferenzeCompleta;
 CREATE VIEW ConferenzeCompleta
 AS
 (
-	SELECT  c.codice AS codice, c.giorno AS giorno, c.ora AS ora, c.argomento AS argomento, conf.cognome_conferenziere AS cognome_conferenziere, conf.nome_conferenziere AS nome_conferenziere
-	FROM Conferenze c JOIN Argomenti_Conferenze ac ON c.argomento = ac.id_argomento_conf JOIN conferenzieri conf ON ac.conferenziere = conf.id_conferenziere
+	SELECT  c.codice AS codice, c.giorno AS giorno, c.ora AS ora, ac.argomento AS argomento, conf.cognome_conferenziere AS cognome_conferenziere, conf.nome_conferenziere AS nome_conferenziere
+	FROM Conferenze c JOIN Argomenti_Conferenze ac ON c.argomento = ac.id_argomento_conf JOIN Conferenzieri conf ON ac.conferenziere = conf.id_conferenziere
 );
 
+
+-- Verra usata dagli studenti per consultare le proprie prenotazioni //TODO 
+DROP VIEW IF EXISTS PrenotazioniAttive;
+CREATE VIEW PrenotazioniAttive
+AS
+(SELECT pren.allievo as CF_allievo, 'Proiezione' AS Tipologia, pc.giorno AS Giorno, pc.ora AS Ora, pc.film AS TitoloArgomento, pc.cognome_regista AS CognomeAutore, pc.nome_regista AS NomeAutore
+FROM Prenotazioni_Proiezioni pren JOIN ProiezioniCompleta pc ON pren.codice_proiezione = pc.codice)
+UNION
+(SELECT pren.allievo as CF_allievo, 'Conferenza' AS Tipologia, c.giorno AS Giorno, c.ora AS Ora, c.argomento AS TitoloArgomento, c.cognome_conferenziere AS CognomeAutore, c.nome_conferenziere AS NomeAutore
+FROM Prenotazioni_Conferenze pren JOIN ConferenzeCompleta c ON pren.codice_conferenza = c.codice);
 
 
 
@@ -284,7 +281,7 @@ BEGIN
 	IF TIPOLOGIA = 0 THEN
 		-- Verifico esistenza regista sul db
         SELECT id_regista INTO idautore
-        FROM registi
+        FROM Registi
         WHERE cognome_regista = cognome_in
         AND nome_regista = nome_in;
         
@@ -298,7 +295,7 @@ BEGIN
         END IF;
         
 		SELECT id_film INTO idopera
-		FROM film
+		FROM Film
 		WHERE titolo = argfilm_in
 		AND regista = idautore;
       
@@ -312,14 +309,14 @@ BEGIN
         
         END IF;
         
-        INSERT INTO proiezioni(giorno, ora, film)
+        INSERT INTO Proiezioni(giorno, ora, film)
         VALUES (giorno_in, ora_in, idopera);
         
 	-- Se è una conferenza TODO
 	ELSEIF TIPOLOGIA = 1 THEN
 
      SELECT id_conferenziere INTO idautore
-        FROM conferenzieri
+        FROM Conferenzieri
         WHERE cognome_conferenziere = cognome_in
         AND nome_conferenziere = nome_in;
         
@@ -333,7 +330,7 @@ BEGIN
         END IF;
         
 		SELECT id_argomento_conf INTO idopera
-		FROM argomenti_conferenze
+		FROM Argomenti_Conferenze
 		WHERE argomento = argfilm_in
 		AND conferenziere = idautore;
       
@@ -347,7 +344,7 @@ BEGIN
         
         END IF;
         
-        INSERT INTO conferenze(giorno, ora, argomento)
+        INSERT INTO Conferenze(giorno, ora, argomento)
         VALUES (giorno_in, ora_in, idopera);
 	ELSE
 		ROLLBACK;
@@ -393,22 +390,95 @@ BEGIN
 END $$
 
 
+-- Verra usata per i report, sia dalla segreteria sia dai docenti 
+DROP VIEW IF EXISTS Impegni_Insegnante;
+CREATE VIEW Impegni_Insegnante 
+AS
+(SELECT i.cf AS CF_Insegnante, i.cognome AS Cognome, i.nome AS Nome, lp.giorno 
+	AS Giorno, lp.ora AS Ora, "--" AS Aula, 'Lezione Privata' AS Tipologia
+FROM Insegnanti i JOIN Lezioni_Private lp ON i.cf = lp.insegnante)
+UNION
+(SELECT i.cf AS CF_Insegnante, i.cognome AS Cognome, i.nome AS Nome, l.giorno 
+	AS Giorno, l.ora AS Ora, l.aula AS Aula, 'Lezione Corso' AS Tipologia
+FROM Insegnanti i JOIN Docenze d ON i.cf = d.insegnante 
+			   JOIN Corsi c ON d.corso = c.codice 
+			   JOIN Lezioni l ON l.corso = c.codice
+) 
+ORDER BY Cognome, Nome, Giorno, Ora;
 
-CREATE USER 'user-insegnanti'@'localhost' IDENTIFIED BY 'insegnantipwd';
-GRANT SELECT PRIVILEGES ON gestione_lingue_straniere.allievi TO 'user-insegnanti'@'localhost';
-GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.lezioni_private  TO 'user-insegnanti'@'localhost';
-GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.Assenze  TO 'user-insegnanti'@'localhost';
-GRANT SELECT PRIVILEGES ON gestione_lingue_straniere.lezione  TO 'user-insegnanti'@'localhost';
+
+
+DELIMITER //
+CREATE TRIGGER controllo_orario_lezione_privata_trg
+BEFORE INSERT
+   ON Lezioni_Private FOR EACH ROW
+
+BEGIN
+  
+    IF EXISTS 
+    (
+    SELECT *
+    FROM Impegni_Insegnante i
+    WHERE i.CF_Insegnante = NEW.insegnante
+    AND HOUR(NEW.ora) = HOUR(i.ora)
+    AND i.Giorno = NEW.giorno
+    ) THEN  
+    SIGNAL SQLSTATE '12345'
+    SET MESSAGE_TEXT = 'Orario gia occupato!';
+
+    END IF;
+END; //
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER controllo_orario_corsi_trg
+BEFORE INSERT
+   ON Docenze FOR EACH ROW
+
+BEGIN
+  
+    IF EXISTS 
+    (
+    SELECT *
+    FROM Impegni_Insegnante i, Corsi c, Lezioni l
+    WHERE i.CF_Insegnante = NEW.insegnante
+	AND NEW.corso = c.codice
+	AND c.codice = l.corso
+    AND HOUR(NEW.ora) = HOUR(l.ora)
+    AND l.giorno = NEW.giorno
+    ) THEN  
+    SIGNAL SQLSTATE '12345'
+    SET MESSAGE_TEXT = 'Una o piu fasce orarie non disponibili!';
+
+    END IF;
+END; //
+DELIMITER ;
 
 
 
-CREATE USER 'user-allievi'@'localhost' IDENTIFIED BY 'allievipwd';
-GRANT SELECT PRIVILEGES ON gestione_lingue_straniere.allievi TO 'user-allievi'@'localhost';
-GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.Prenotazioni_Conferenze TO 'user-allievi'@'localhost';
-GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.Prenotazioni_Proiezioni TO 'user-allievi'@'localhost';
-GRANT SELECT, INSERT, DELETE PRIVILEGES ON gestione_lingue_straniere.Lezioni_Private TO 'user-allievi'@'localhost';
 
-CREATE USER 'user-segreteria'@'localhost' IDENTIFIED BY 'segreteriapwd';
+
+
+
+
+COMMIT;
+
+GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Lezioni_Private  TO 'user-insegnanti'@'localhost';
+GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Assenze  TO 'user-insegnanti'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.Lezioni  TO 'user-insegnanti'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.Insegnanti  TO 'user-insegnanti'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.Impegni_Insegnante TO 'user-insegnanti'@'localhost';
+
+GRANT SELECT  ON gestione_lingue_straniere.Allievi TO 'user-allievi'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.ProiezioniCompleta TO 'user-allievi'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.ConferenzeCompleta TO 'user-allievi'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.PrenotazioniAttive TO 'user-allievi'@'localhost';
+GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Prenotazioni_Conferenze TO 'user-allievi'@'localhost';
+GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Prenotazioni_Proiezioni TO 'user-allievi'@'localhost';
+GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Lezioni_Private TO 'user-allievi'@'localhost';
+GRANT EXECUTE ON PROCEDURE gestione_lingue_straniere.Prenotazione_Attivita TO 'user-allievi'@'localhost';
+
+
 GRANT ALL PRIVILEGES ON * . * TO 'user-segreteria'@'localhost';
 
 FLUSH PRIVILEGES;
@@ -418,6 +488,8 @@ VALUES('Intermediate', 'Cambridge Book', TRUE);
 
 INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
 VALUES('AAAAAAAAAAAAAAAA', MD5('password'), 'Francesco', 'Rossi', 'Via Roma 25', 'UK');
+INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
+VALUES('QWERTYUIOPASDFGH', md5('pwd'), 'Francesco', 'Rossi', 'Via Roma 25', 'UK');
 
 CALL `gestione_lingue_straniere`.`ATTIVA_CORSO`('Intermediate');
 CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('BBBBBBBBBBBBBBBB', 'pwd', 'Bianchi', 'Valentino', '0660600600', 1);
@@ -427,9 +499,7 @@ INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B2", CURDATE(), NOW(), 1)
 INSERT INTO Corsi(Livello) VALUES('Intermediate');
 
 INSERT INTO Docenze(insegnante, corso) VALUES ('AAAAAAAAAAAAAAAA', 1);
-
 CALL `gestione_lingue_straniere`.`Nuova_Attivita`(0, '2019-10-4', '7:00:00', 'Orwell 1984', 'Radford', 'Michael');
 CALL `gestione_lingue_straniere`.`Nuova_Attivita`(1, '2019-10-4', '7:00:00', 'About English Language', 'Reds', 'Mario');
-
 
 COMMIT;

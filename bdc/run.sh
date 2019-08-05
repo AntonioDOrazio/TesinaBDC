@@ -8,10 +8,8 @@ while ! mysqladmin ping -pbdc --silent; do
 done
 sleep 5
 
-
-mysqladmin -u root password 'bdc'
-mysqladmin -u root -h  password 'bdc'
-
+mysqladmin -u root password "bdc"
+mysqladmin -u root -h password "bdc"
 
 cd $STUDENTE
 
