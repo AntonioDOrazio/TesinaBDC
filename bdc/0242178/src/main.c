@@ -114,6 +114,7 @@ void gestioneInsegnante()
 
 				printf("Elenco lezioni per corso fino ad oggi. \n");
 				
+				// Include la regola aziendale 
 				snprintf(q, 512, "SELECT l.aula, l.giorno, l.ora FROM Lezioni l WHERE l.corso = %d AND giorno <= DATE(NOW())", selezione);
 				query(q);			
 
@@ -275,6 +276,18 @@ void gestioneAllievo()
 
 				break;
 
+			case 5:
+
+				printf("Lista assenze \n");
+
+				snprintf(q, 512, "SELECT * FROM Assenze WHERE allievo = '%s'", cf);
+
+				query(q);
+
+				printResult(q);
+
+				break; 
+
 			default:
 				printf("Scelta non valida ");
 				break;
@@ -291,7 +304,7 @@ void gestioneSegreteria()
 		printf("1 - Attiva un nuovo corso\n");
 		printf("2 - Iscrizione di un nuovo allievo\n");
 		printf("3 - Assegnazione di un insegnante a un corso\n");
-		printf("4 - Attivazione di una attivit� culturale\n");
+		printf("4 - Attivazione di una attivita culturale\n");
 		printf("5 - Report mensile \n");
 		printf("6 - Nuovo anno \n");
 		printf("0 - Menu principale \n");
@@ -431,6 +444,8 @@ void gestioneSegreteria()
 			break;
 
 		case 5:
+			printf("Report mensile \n");
+
 			query("SELECT CF_Insegnante,  Cognome,  Nome,  Giorno,  Ora,  Aula, Tipologia FROM Impegni_Insegnante ORDER BY CF_Insegnante, Giorno, Ora");
 			
 			printResult();

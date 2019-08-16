@@ -455,6 +455,29 @@ END; //
 DELIMITER ;
 
 
+
+DELIMITER //
+CREATE TRIGGER controllo_assenza_studente
+BEFORE INSERT
+   ON Assenze FOR EACH ROW
+
+BEGIN
+  
+    IF NOT EXISTS 
+    (
+        SELECT * FROM Lezioni l, Allievi al
+        WHERE l.aula = NEW.aula AND l.giorno = NEW.giorno AND l.ora = NEW.ora AND l.corso = al.corso AND al.cf = NEW.allievo
+    ) THEN  
+    SIGNAL SQLSTATE '12345'
+    SET MESSAGE_TEXT = 'Allievo non appartenente al corso';
+
+    END IF;
+END; //
+DELIMITER ;
+
+
+
+
 CREATE INDEX proiezioni_idx ON Proiezioni(giorno, ora);
 CREATE INDEX conferenze_idx ON Conferenze(giorno, ora);
 
@@ -507,21 +530,38 @@ CALL `gestione_lingue_straniere`.`ATTIVA_CORSO`('Advanced');
 
 CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000000', 'password', 'Bianchi', 'Valentino', '0660600601', 1);
 CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000001', 'password', 'Rossi', 'Mario', '0660600602', 2);
-CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000002', 'password', 'Verdi', 'Stefano', '0660600603', 3);
+CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000002', 'password', 'Verdi', 'Stefano', '0660600603', 2);
 
 
+-- Settimana che va dal 9-30 al 10-4
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B2", '2019-9-30', '8:00:00', 1);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("A4", '2019-10-2', '8:00:00', 1);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("3", '2019-10-4', '8:00:00', 1);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("C4", '2019-9-30', '14:00:00', 2);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B15", '2019-10-2', '14:00:00', 2);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B15", '2019-10-4', '14:00:00', 2);
 
 
-INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B2", CURDATE(), NOW(), 1);
-INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("A4", CURDATE(), NOW(), 1);
-INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("3", CURDATE(), NOW(), 1);
-INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("C4", CURDATE(), NOW(), 1);
-INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B15", CURDATE(), NOW(), 1);
+INSERT INTO Docenze(insegnante, corso) VALUES ('INSEGNANTE000000', 1);
+INSERT INTO Docenze(insegnante, corso) VALUES ('INSEGNANTE000001', 1);
+INSERT INTO Docenze(insegnante, corso) VALUES ('INSEGNANTE000002', 2);
 
-INSERT INTO Corsi(Livello) VALUES('Intermediate');
 
-INSERT INTO Docenze(insegnante, corso) VALUES ('AAAAAAAAAAAAAAAA', 1);
-CALL `gestione_lingue_straniere`.`Nuova_Attivita`(0, '2019-10-4', '7:00:00', 'Orwell 1984', 'Radford', 'Michael');
-CALL `gestione_lingue_straniere`.`Nuova_Attivita`(1, '2019-10-4', '7:00:00', 'About English Language', 'Reds', 'Mario');
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B14", '2019-9-23', '8:00:00', 1);
+INSERT INTO Assenze(allievo, giorno, ora, aula) VALUES("ALLIEVO000000000", '2019-9-23', '8:00:00', "B14");
+
+
+-- TODO poi rimuovi, questa dovrebbe dare errore 
+-- INSERT INTO Assenze(allievo, giorno, ora, aula) VALUES("ALLIEVO000000001", '2019-9-23', '8:00:00', "B14");
+
+
+CALL `gestione_lingue_straniere`.`Nuova_Attivita`(0, '2019-10-4', '14:00:00', 'Orwell 1984', 'Radford', 'Michael');
+CALL `gestione_lingue_straniere`.`Nuova_Attivita`(1, '2019-10-4', '8:00:00', 'About English Language', 'Reds', 'Mario');
+
+
+CALL `gestione_lingue_straniere`.`PRENOTAZIONE_ATTIVITA`(0, 'ALLIEVO000000000', 1);
+CALL `gestione_lingue_straniere`.`PRENOTA_LEZIONE`('INSEGNANTE000000', 'ALLIEVO000000000', '2019-10-3', '9:00:00');
+-- todo POI FANNE UNA CON ORARio occupato
+
 
 COMMIT;
