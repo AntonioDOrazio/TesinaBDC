@@ -430,29 +430,41 @@ BEGIN
 END; //
 DELIMITER ;
 
-DELIMITER //
-CREATE TRIGGER controllo_orario_corsi_trg
-BEFORE INSERT
-   ON Docenze FOR EACH ROW
 
-BEGIN
-  
-    IF EXISTS 
+
+
+DELIMITER //
+CREATE TRIGGER controllo_orario_lezione_privata_trg
+BEFORE INSERT
+   ON Lezioni_Private FOR EACH ROW
+
+BEGIN 
+    IF EXISTS
     (
-    SELECT *
-    FROM Impegni_Insegnante i, Corsi c, Lezioni l
-    WHERE i.CF_Insegnante = NEW.insegnante
-	AND NEW.corso = c.codice
-	AND c.codice = l.corso
-    AND HOUR(i.ora) = HOUR(l.ora)
-    AND l.giorno = i.giorno
-    ) THEN  
+        (SELECT i.cf AS CF_Insegnante, i.cognome AS Cognome, i.nome AS Nome, lp.giorno 
+	    AS Giorno, lp.ora AS Ora
+        FROM Insegnanti i JOIN Lezioni_Private lp ON i.cf = lp.insegnante
+        WHERE i.cf = NEW.insegnante
+        AND HOUR(NEW.ora) = HOUR(lp.ora)
+        AND lp.giorno = NEW.giorno)
+        UNION
+        (SELECT i.cf AS CF_Insegnante, i.cognome AS Cognome, i.nome AS Nome, l.giorno 
+	    AS Giorno, l.ora AS Ora
+        FROM Insegnanti i JOIN Docenze d ON i.cf = d.insegnante 
+		JOIN Corsi c ON d.corso = c.codice 
+		JOIN Lezioni l ON l.corso = c.codice
+        WHERE i.cf = NEW.insegnante
+        AND HOUR(NEW.ora) = HOUR(l.ora)
+        AND l.giorno = NEW.giorno)
+    ) THEN   
     SIGNAL SQLSTATE '12345'
-    SET MESSAGE_TEXT = 'Una o piu fasce orarie non disponibili!';
+    SET MESSAGE_TEXT = 'Orario gia occupato!';
 
     END IF;
 END; //
 DELIMITER ;
+
+
 
 
 
