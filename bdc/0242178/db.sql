@@ -413,31 +413,6 @@ CREATE TRIGGER controllo_orario_lezione_privata_trg
 BEFORE INSERT
    ON Lezioni_Private FOR EACH ROW
 
-BEGIN
-  
-    IF EXISTS 
-    (
-    SELECT *
-    FROM Impegni_Insegnante i
-    WHERE i.CF_Insegnante = NEW.insegnante
-    AND HOUR(NEW.ora) = HOUR(i.ora)
-    AND i.Giorno = NEW.giorno
-    ) THEN  
-    SIGNAL SQLSTATE '12345'
-    SET MESSAGE_TEXT = 'Orario gia occupato!';
-
-    END IF;
-END; //
-DELIMITER ;
-
-
-
-
-DELIMITER //
-CREATE TRIGGER controllo_orario_lezione_privata_trg
-BEFORE INSERT
-   ON Lezioni_Private FOR EACH ROW
-
 BEGIN 
     IF EXISTS
     (
