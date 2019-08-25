@@ -48,7 +48,10 @@ CREATE TABLE `Allievi`
     pwd VARCHAR(32),
     cognome VARCHAR(30),
     nome VARCHAR(30),
-    telefono VARCHAR(10),
+    sesso ENUM('M', 'F'),
+    data_nascita DATE,
+    luogo_nascita VARCHAR(15),
+    indirizzo VARCHAR(60),
     corso INTEGER,
     data_iscrizione DATE,
     FOREIGN KEY(corso) REFERENCES Corsi(codice)
@@ -141,7 +144,6 @@ CREATE TABLE `Argomenti_Conferenze`
 );
 
 
-
 CREATE TABLE `Conferenze`
 (
 	codice INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -163,7 +165,6 @@ CREATE TABLE `Prenotazioni_Conferenze`
 );
 
 -- Viste 
-
 -- Verra usata per i report, sia dalla segreteria sia dagli insegnanti 
 DROP VIEW IF EXISTS Impegni_Insegnante;
 CREATE VIEW Impegni_Insegnante 
@@ -180,7 +181,7 @@ FROM Insegnanti i JOIN Docenze d ON i.cf = d.insegnante
 ) 
 ORDER BY Cognome, Nome, Giorno, Ora;
 
--- Verra usata dagli allievi per prenotare una lezione privata
+-- Verra usata dagli allievi per visualizzare le lezioni private
 DROP VIEW IF EXISTS Prenotazioni_Lezioni_Private;
 CREATE VIEW Prenotazioni_Lezioni_Private
 AS
@@ -191,7 +192,6 @@ FROM Allievi a JOIN Lezioni_Private  lp ON lp.allievo = a.cf
 	JOIN Insegnanti i ON lp.insegnante = i.cf;
 
 -- Le seguenti viste ricongiungono Proiezioni/Film/Registi e Conferenze/Argomenti_Conferenze/Conferenzieri
-
 DROP VIEW IF EXISTS ProiezioniCompleta;
 CREATE VIEW ProiezioniCompleta
 AS
@@ -208,7 +208,6 @@ AS
 	FROM Conferenze c JOIN Argomenti_Conferenze ac ON c.argomento = ac.id_argomento_conf JOIN Conferenzieri conf ON ac.conferenziere = conf.id_conferenziere
 );
 
-
 -- Verra usata dagli allievi per consultare le proprie prenotazioni //TODO 
 DROP VIEW IF EXISTS PrenotazioniAttive;
 CREATE VIEW PrenotazioniAttive
@@ -220,57 +219,8 @@ UNION
 FROM Prenotazioni_Conferenze pren JOIN ConferenzeCompleta c ON pren.codice_conferenza = c.codice);
 
 
-
+-- Procedure
 DELIMITER $$
-CREATE PROCEDURE ATTIVA_CORSO(IN lvl VARCHAR(30))
-BEGIN
-	START TRANSACTION;
-
-	INSERT INTO Corsi(Livello)
-	VALUES(lvl);
-
-	COMMIT;
-END $$
-
-DELIMITER ;
-
-
-DELIMITER $$
-CREATE PROCEDURE Registra_Allievo(IN cf_in VARCHAR(16), IN pwd_in VARCHAR(32), IN cognome_in VARCHAR(30), IN nome_in VARCHAR(30), IN tel_in VARCHAR(10), IN corso_in INTEGER)
-BEGIN
-	START TRANSACTION;
-
-	INSERT INTO Allievi(cf, pwd, cognome, nome, telefono, corso, data_iscrizione)
-	VALUES(cf_in, MD5(pwd_in), cognome_in, nome_in, tel_in, corso_in, CURDATE());
-
-	COMMIT;
-END $$
-
-DELIMITER ;
-
-DELIMITER $$
-CREATE PROCEDURE ASSEGNA_INSEGNANTE(IN insegnante_in VARCHAR(10), IN corso_in INTEGER)
-BEGIN
-	START TRANSACTION;
-
-	INSERT INTO Docenze(insegnante, corso)
-	VALUES(insegnante_in, corso_in);
-
-	COMMIT;
-END $$
-
-
-CREATE PROCEDURE PRENOTA_LEZIONE(IN	insegnante_in VARCHAR(16), IN allievo_in VARCHAR(16), IN giorno_in DATE, IN ora_in TIME)
-BEGIN
-	START TRANSACTION;
-
-	INSERT INTO Lezioni_Private(insegnante, allievo, giorno, ora)
-	VALUES(insegnante_in, allievo_in, giorno_in, ora_in);
-
-	COMMIT;
-END $$
-
-
 CREATE PROCEDURE Nuova_Attivita(IN TIPOLOGIA INTEGER, IN giorno_in DATE, IN ora_in TIME, IN argfilm_in VARCHAR(60), IN cognome_in VARCHAR(30), IN nome_in VARCHAR(30))
 BEGIN
 
@@ -315,7 +265,7 @@ BEGIN
 	-- Se è una conferenza TODO
 	ELSEIF TIPOLOGIA = 1 THEN
 
-     SELECT id_conferenziere INTO idautore
+        SELECT id_conferenziere INTO idautore
         FROM Conferenzieri
         WHERE cognome_conferenziere = cognome_in
         AND nome_conferenziere = nome_in;
@@ -351,8 +301,10 @@ BEGIN
 	END IF;
 
 	COMMIT;
-END $$
+END$$
+DELIMITER ;
 
+DELIMITER $$
 CREATE PROCEDURE PRENOTAZIONE_ATTIVITA(IN TIPOLOGIA INTEGER, IN allievo_in VARCHAR(16), IN codice_in INTEGER)
 BEGIN
 	-- Se è una proiezione
@@ -370,25 +322,57 @@ BEGIN
 	END IF;
 
 	COMMIT;
-END $$
+END$$
+DELIMITER ;
 
+DELIMITER $$
+CREATE PROCEDURE Aggiungi_Assenza(IN allievo_in VARCHAR(16), IN giorno_in DATE, IN ora_in TIME, IN aula_in VARCHAR(4), IN insegnante_in VARCHAR(16))
+BEGIN
 
+    -- Solo un insegnante abilitato al corso puo aggiungere una assenza
+    IF NOT EXISTS  
+    (SELECT d.insegnante FROM Docenze d JOIN Corsi c ON d.corso = c.codice JOIN Lezioni l ON l.corso = c.codice
+    WHERE d.insegnante = insegnante_in
+    AND l.giorno = giorno_in
+    AND l.ora = ora_in
+    AND l.aula = aula_in)
+
+    THEN
+        SIGNAL SQLSTATE '12345'
+        SET MESSAGE_TEXT = 'Insegnante non abilitato al corso';
+        ROLLBACK;
+    ELSE
+        INSERT INTO Assenze(allievo, giorno, ora, aula) VALUES (allievo_in, giorno_in, ora_in, aula_in);
+	    COMMIT;
+	END IF;
+END$$
+DELIMITER ;
+
+DELIMITER $$
 CREATE PROCEDURE Nuovo_Anno()
 BEGIN
-	
-	TRUNCATE TABLE Iscrizioni;
-	TRUNCATE TABLE Docenze;
-	TRUNCATE TABLE Lezioni;
-	TRUNCATE TABLE Assenze;
-	TRUNCATE TABLE Prenotazioni_Conferenze;
-	TRUNCATE TABLE Prenotazioni_Proiezioni;
-	TRUNCATE TABLE Conferenze;
-	TRUNCATE TABLE Proiezioni;
-	TRUNCATE TABLE Corsi;
+
+    -- Ipotizzo che Livelli ed Insegnanti rimangano da un anno all'altro
+	SET FOREIGN_KEY_CHECKS = 0;
+    TRUNCATE TABLE Prenotazioni_Conferenze;
+    TRUNCATE TABLE Prenotazioni_Proiezioni;
+    TRUNCATE TABLE Conferenze;
+    TRUNCATE TABLE Proiezioni;
+    TRUNCATE TABLE Argomenti_Conferenze;
+    TRUNCATE TABLE Film;
+    TRUNCATE TABLE Conferenzieri;
+    TRUNCATE TABLE Registi;
+    TRUNCATE TABLE Lezioni_Private;
+    TRUNCATE TABLE Assenze;
+    TRUNCATE TABLE Lezioni;
+    TRUNCATE TABLE Allievi;
+    TRUNCATE TABLE Docenze;
+    TRUNCATE TABLE Corsi;
+    SET FOREIGN_KEY_CHECKS = 1;
 
 	COMMIT;
-END $$
-
+END$$
+DELIMITER ;
 
 -- Verra usata per i report, sia dalla segreteria sia dagli insegnanti 
 DROP VIEW IF EXISTS Impegni_Insegnante;
@@ -406,13 +390,39 @@ FROM Insegnanti i JOIN Docenze d ON i.cf = d.insegnante
 ) 
 ORDER BY Cognome, Nome, Giorno, Ora;
 
+DELIMITER $$
+CREATE TRIGGER controllo_orario_corsi_trg
+BEFORE INSERT
+   ON Docenze FOR EACH ROW
+BEGIN
+    IF EXISTS
+    (
+        SELECT l.giorno, l.ora 
+        FROM Lezioni l JOIN Corsi c 
+        ON c.codice = l.corso 
+        JOIN Docenze d ON d.corso = c.codice
+        WHERE d.insegnante = NEW.insegnante
+        AND c.codice <> NEW.corso
+        INTERSECT
+        SELECT l.giorno, l.ora 
+        FROM Lezioni l 
+        WHERE l.corso = NEW.corso 
+    ) 
+    THEN  
+        SIGNAL SQLSTATE '12345'
+        SET MESSAGE_TEXT = 'Una o piu fasce orarie non disponibili!';
+    END IF;
+END$$
+DELIMITER ;
 
 
-DELIMITER //
+-- Trigger
+
+-- Se una lezione privata cade in un orario in cui l'insegnante ha l'orario occupato, ne impedisce la prenotazione
+DELIMITER $$
 CREATE TRIGGER controllo_orario_lezione_privata_trg
 BEFORE INSERT
    ON Lezioni_Private FOR EACH ROW
-
 BEGIN 
     IF EXISTS
     (
@@ -431,94 +441,88 @@ BEGIN
         WHERE i.cf = NEW.insegnante
         AND HOUR(NEW.ora) = HOUR(l.ora)
         AND l.giorno = NEW.giorno)
-    ) THEN   
-    SIGNAL SQLSTATE '12345'
-    SET MESSAGE_TEXT = 'Orario gia occupato!';
-
+    ) 
+    THEN   
+        SIGNAL SQLSTATE '12345'
+        SET MESSAGE_TEXT = 'Orario gia occupato!';
     END IF;
-END; //
+END$$
 DELIMITER ;
 
-
-
-
-
-DELIMITER //
-CREATE TRIGGER controllo_assenza_studente
+-- Verifica che l'allievo appartenga al corso, e che la lezione si sia gia verificata
+DELIMITER $$
+CREATE TRIGGER controllo_validita_assenza_trg
 BEFORE INSERT
    ON Assenze FOR EACH ROW
-
 BEGIN
-  
     IF NOT EXISTS 
     (
         SELECT * FROM Lezioni l, Allievi al
         WHERE l.aula = NEW.aula AND l.giorno = NEW.giorno AND l.ora = NEW.ora AND l.corso = al.corso AND al.cf = NEW.allievo
-    ) THEN  
-    SIGNAL SQLSTATE '12345'
-    SET MESSAGE_TEXT = 'Allievo non appartenente al corso';
-
+    ) 
+    THEN  
+        SIGNAL SQLSTATE '12345'
+        SET MESSAGE_TEXT = 'Data o allievo non validi';
+    ELSEIF (NEW.giorno > NOW())
+        THEN 
+        SIGNAL SQLSTATE '12345'
+        SET MESSAGE_TEXT = 'Lezione ancora da verificarsi';
     END IF;
-END; //
+END$$
 DELIMITER ;
-
-
-
 
 CREATE INDEX proiezioni_idx ON Proiezioni(giorno, ora);
 CREATE INDEX conferenze_idx ON Conferenze(giorno, ora);
 
-
 COMMIT;
 
 GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Assenze  TO 'user-insegnanti'@'localhost';
-GRANT SELECT  gestione_lingue_straniere.Lezioni_Private  TO 'user-insegnanti'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.Lezioni_Private  TO 'user-insegnanti'@'localhost';
 GRANT SELECT  ON gestione_lingue_straniere.Lezioni  TO 'user-insegnanti'@'localhost';
 GRANT SELECT  ON gestione_lingue_straniere.Insegnanti  TO 'user-insegnanti'@'localhost';
 GRANT SELECT  ON gestione_lingue_straniere.Impegni_Insegnante TO 'user-insegnanti'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.Docenze TO 'user-insegnanti'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.Corsi TO 'user-insegnanti'@'localhost';
+GRANT EXECUTE ON PROCEDURE gestione_lingue_straniere.Aggiungi_Assenza TO 'user-insegnanti'@'localhost';
 
 GRANT SELECT  ON gestione_lingue_straniere.Allievi TO 'user-allievi'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.Insegnanti TO 'user-allievi'@'localhost';
 GRANT SELECT  ON gestione_lingue_straniere.ProiezioniCompleta TO 'user-allievi'@'localhost';
 GRANT SELECT  ON gestione_lingue_straniere.ConferenzeCompleta TO 'user-allievi'@'localhost';
 GRANT SELECT  ON gestione_lingue_straniere.PrenotazioniAttive TO 'user-allievi'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.Assenze TO 'user-allievi'@'localhost';
+GRANT SELECT  ON gestione_lingue_straniere.Prenotazioni_Lezioni_Private TO 'user-allievi'@'localhost';
 GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Prenotazioni_Conferenze TO 'user-allievi'@'localhost';
 GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Prenotazioni_Proiezioni TO 'user-allievi'@'localhost';
 GRANT SELECT, INSERT, DELETE  ON gestione_lingue_straniere.Lezioni_Private TO 'user-allievi'@'localhost';
 GRANT EXECUTE ON PROCEDURE gestione_lingue_straniere.Prenotazione_Attivita TO 'user-allievi'@'localhost';
 
-
 GRANT ALL PRIVILEGES ON * . * TO 'user-segreteria'@'localhost';
 
 FLUSH PRIVILEGES;
 
-
-
 -- Popolazione del DB con dei dati di prova
-INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario)
-VALUES('Beginner', 'English for beginners', FALSE);
+INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario) VALUES('Elementary', 'English for beginners', FALSE);
 
-INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario)
-VALUES('Intermediate', 'Cambridge Book', TRUE);
+INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario) VALUES('Intermediate', 'Cambridge Book', FALSE);
 
-INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario)
-VALUES('Advanced', 'Oxford Workbook', TRUE);
+INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario) VALUES('First Certificate', 'Oxford Workbook', TRUE);
 
+INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario) VALUES('Advanced', 'Oxford Workbook 2', TRUE);
 
-INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
-VALUES('INSEGNANTE000000', MD5('password'), 'Brock', 'Boris', 'Oxford Street 24', 'UK');
-INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
-VALUES('INSEGNANTE000001', md5('password'), 'Taylor', 'Vincent', 'Cook Square 99', 'AU');
-INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione)
-VALUES('INSEGNANTE000002', md5('password'), 'Smith', 'Robert', 'Grafton Street 101', 'IE');
+INSERT INTO Livelli(denominazione, titolo_libro, esame_necessario) VALUES('Proficiency', 'Proficiency Workbook', TRUE);
 
-CALL `gestione_lingue_straniere`.`ATTIVA_CORSO`('Beginner');
-CALL `gestione_lingue_straniere`.`ATTIVA_CORSO`('Intermediate');
-CALL `gestione_lingue_straniere`.`ATTIVA_CORSO`('Advanced');
+INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione) VALUES('INSEGNANTE000000', MD5('password'), 'Brock', 'Boris', 'Oxford Street 24', 'UK');
+INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione) VALUES('INSEGNANTE000001', md5('password'), 'Taylor', 'Vincent', 'Cook Square 99', 'AU');
+INSERT INTO Insegnanti(cf, pwd, cognome, nome, indirizzo, nazione) VALUES('INSEGNANTE000002', md5('password'), 'Smith', 'Robert', 'Grafton Street 101', 'IE');
 
-CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000000', 'password', 'Bianchi', 'Valentino', '0660600601', 1);
-CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000001', 'password', 'Rossi', 'Mario', '0660600602', 2);
-CALL `gestione_lingue_straniere`.`REGISTRA_ALLIEVO`('ALLIEVO000000002', 'password', 'Verdi', 'Stefano', '0660600603', 2);
+INSERT INTO Corsi(Livello, data_attivazione) VALUES('Elementary', NOW());
+INSERT INTO Corsi(Livello, data_attivazione) VALUES('Intermediate', NOW());
+INSERT INTO Corsi(Livello, data_attivazione) VALUES('Advanced', NOW());
 
+INSERT INTO Allievi(cf, pwd, cognome, nome, sesso, data_nascita, luogo_nascita, indirizzo, corso, data_iscrizione) VALUES('ALLIEVO000000000', MD5('password'), 'Bianchi', 'Valentino', 'M', '1996-10-3', 'Roma', 'Via Tuscolana 300', 1, CURDATE());
+INSERT INTO Allievi(cf, pwd, cognome, nome, sesso, data_nascita, luogo_nascita, indirizzo, corso, data_iscrizione) VALUES('ALLIEVO000000001', MD5('password'), 'Rossi', 'Maria', 'F','1997-3-25', 'Milano', 'Via Casilina 150', 2, CURDATE());
+INSERT INTO Allievi(cf, pwd, cognome, nome, sesso, data_nascita, luogo_nascita, indirizzo, corso, data_iscrizione) VALUES('ALLIEVO000000002', MD5('password'), 'Verdi', 'Stefano', 'M','1995-11-2','Firenze', 'Viale Marconi 45', 2, CURDATE());
 
 -- Settimana che va dal 9-30 al 10-4
 INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B2", '2019-9-30', '8:00:00', 1);
@@ -528,27 +532,19 @@ INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("C4", '2019-9-30', '14:00:
 INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B15", '2019-10-2', '14:00:00', 2);
 INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B15", '2019-10-4', '14:00:00', 2);
 
-
 INSERT INTO Docenze(insegnante, corso) VALUES ('INSEGNANTE000000', 1);
 INSERT INTO Docenze(insegnante, corso) VALUES ('INSEGNANTE000001', 1);
 INSERT INTO Docenze(insegnante, corso) VALUES ('INSEGNANTE000002', 2);
 
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("H3", '2019-8-22', '8:00:00', 1);
+INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("H2", '2019-8-21', '8:00:00', 1);
 
-INSERT INTO Lezioni(aula, giorno, ora, corso) VALUES ("B14", '2019-9-23', '8:00:00', 1);
-INSERT INTO Assenze(allievo, giorno, ora, aula) VALUES("ALLIEVO000000000", '2019-9-23', '8:00:00', "B14");
-
-
--- TODO poi rimuovi, questa dovrebbe dare errore 
--- INSERT INTO Assenze(allievo, giorno, ora, aula) VALUES("ALLIEVO000000001", '2019-9-23', '8:00:00', "B14");
-
+INSERT INTO Assenze(allievo, giorno, ora, aula) VALUES ('ALLIEVO000000000', '2019-8-22', '8:00:00', 'H3');
 
 CALL `gestione_lingue_straniere`.`Nuova_Attivita`(0, '2019-10-4', '14:00:00', 'Orwell 1984', 'Radford', 'Michael');
 CALL `gestione_lingue_straniere`.`Nuova_Attivita`(1, '2019-10-4', '8:00:00', 'About English Language', 'Reds', 'Mario');
 
-
 CALL `gestione_lingue_straniere`.`PRENOTAZIONE_ATTIVITA`(0, 'ALLIEVO000000000', 1);
-CALL `gestione_lingue_straniere`.`PRENOTA_LEZIONE`('INSEGNANTE000000', 'ALLIEVO000000000', '2019-10-3', '9:00:00');
--- todo POI FANNE UNA CON ORARio occupato
-
+INSERT INTO Lezioni_Private(insegnante, allievo, giorno, ora) VALUES('INSEGNANTE000000', 'ALLIEVO000000000', '2019-10-3', '9:00:00');
 
 COMMIT;
